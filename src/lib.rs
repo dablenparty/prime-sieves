@@ -1,6 +1,6 @@
 #![warn(clippy::all, clippy::pedantic)]
 
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 /// Adapted from the Haskell implementation by
 /// [Melissa O'Neill](https://www.cs.hmc.edu/~oneill/papers/Sieve-JFP.pdf)
@@ -14,21 +14,25 @@ impl Iterator for Primes {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(facts) = self.table.remove(&self.x) {
-            facts
-                .iter()
-                .map(|&fact| (self.x + fact, vec![fact]))
-                .for_each(|(k, v)| {
-                    self.table
-                        .entry(k)
-                        .and_modify(|e| e.extend(v.clone()))
-                        .or_insert(v);
-                });
+            // this could be done with iter chains, but that requires
+            // unnecessary cloning
+            for (k, v) in facts.iter().map(|&fact| (self.x + fact, vec![fact])) {
+                match self.table.entry(k) {
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().extend(v);
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(v);
+                    }
+                }
+            }
             self.x += 1;
             self.next()
         } else {
-            self.table.insert(self.x * self.x, vec![self.x]);
+            let x = self.x;
+            self.table.insert(x * x, vec![x]);
             self.x += 1;
-            Some(self.x - 1)
+            Some(x)
         }
     }
 }
