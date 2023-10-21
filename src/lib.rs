@@ -1,48 +1,65 @@
 #![warn(clippy::all, clippy::pedantic)]
 
-use std::collections::{hash_map::Entry, HashMap};
+use std::{cmp::Reverse, collections::BinaryHeap};
+
+pub type MinPriorityQueue = BinaryHeap<Reverse<(u64, u64)>>;
 
 /// Adapted from the Haskell implementation by
 /// [Melissa O'Neill](https://www.cs.hmc.edu/~oneill/papers/Sieve-JFP.pdf)
-struct Primes {
+pub struct PrimesIter {
     x: u64,
-    table: HashMap<u64, Vec<u64>>,
+    candidate: (u64, u64),
+    table: MinPriorityQueue,
 }
 
-impl Iterator for Primes {
+impl Iterator for PrimesIter {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(facts) = self.table.remove(&self.x) {
-            // this could be done with iter chains, but that requires
-            // unnecessary cloning
-            for (k, v) in facts.iter().map(|&fact| (self.x + fact, vec![fact])) {
-                match self.table.entry(k) {
-                    Entry::Occupied(mut e) => {
-                        e.get_mut().extend(v);
-                    }
-                    Entry::Vacant(e) => {
-                        e.insert(v);
-                    }
-                }
+        if self.x == 2 {
+            self.x += 1;
+            return Some(2);
+        } else if self.x == 3 {
+            self.x += 2;
+            self.table.push(Reverse((9, 6)));
+            return Some(3);
+        }
+
+        assert!(self.x % 2 != 0, "x must be odd");
+
+        loop {
+            if self.x < self.candidate.0 {
+                let x = self.x;
+                self.table.push(Reverse((x * x, x * 2)));
+                self.x += 2;
+                return Some(x);
             }
-            self.x += 1;
-            self.next()
-        } else {
-            let x = self.x;
-            self.table.insert(x * x, vec![x]);
-            self.x += 1;
-            Some(x)
+            while self.x == self.candidate.0 {
+                self.table.push(Reverse((
+                    self.candidate.0 + self.candidate.1,
+                    self.candidate.1,
+                )));
+                self.candidate = self.table.pop().unwrap().0;
+            }
+            self.x += 2;
         }
     }
 }
 
-impl Primes {
-    fn new() -> Self {
+impl PrimesIter {
+    #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
+    pub fn new() -> Self {
         Self {
             x: 2,
-            table: HashMap::default(),
+            candidate: (9, 6),
+            table: MinPriorityQueue::default(),
         }
+    }
+}
+
+impl Default for PrimesIter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -53,21 +70,24 @@ mod tests {
     #[test]
     fn test_first_five_primes() {
         let expected = vec![2, 3, 5, 7, 11];
-        let actual: Vec<_> = Primes::new().take(5).collect();
+        let actual: Vec<_> = PrimesIter::default().take(5).collect();
         assert_eq!(expected, actual);
     }
 
     #[test]
-    fn test_first_100_primes() {
+    fn test_next_100_primes() {
+        // Skips the first 100 primes and takes the next 100. This is more
+        // of a sanity check to make sure that it isn't too slow.
         let expected = vec![
-            2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83,
-            89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179,
-            181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271,
-            277, 281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379,
-            383, 389, 397, 401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479,
-            487, 491, 499, 503, 509, 521, 523, 541,
+            547, 557, 563, 569, 571, 577, 587, 593, 599, 601, 607, 613, 617, 619, 631, 641, 643,
+            647, 653, 659, 661, 673, 677, 683, 691, 701, 709, 719, 727, 733, 739, 743, 751, 757,
+            761, 769, 773, 787, 797, 809, 811, 821, 823, 827, 829, 839, 853, 857, 859, 863, 877,
+            881, 883, 887, 907, 911, 919, 929, 937, 941, 947, 953, 967, 971, 977, 983, 991, 997,
+            1009, 1013, 1019, 1021, 1031, 1033, 1039, 1049, 1051, 1061, 1063, 1069, 1087, 1091,
+            1093, 1097, 1103, 1109, 1117, 1123, 1129, 1151, 1153, 1163, 1171, 1181, 1187, 1193,
+            1201, 1213, 1217, 1223,
         ];
-        let actual: Vec<_> = Primes::new().take(100).collect();
+        let actual: Vec<_> = PrimesIter::default().skip(100).take(100).collect();
         assert_eq!(expected, actual);
     }
 }
