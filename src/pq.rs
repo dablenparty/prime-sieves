@@ -28,7 +28,7 @@ impl Iterator for QueuePrimesIter {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
-        const STEP: u64 = 2;
+        const CANDIDATE_STEP: u64 = 2;
 
         match self.candidate {
             0 | 1 => unreachable!(),
@@ -37,8 +37,8 @@ impl Iterator for QueuePrimesIter {
                 return Some(2);
             }
             3 => {
-                self.candidate += STEP;
-                self.pq.push(Reverse((9, 6)));
+                self.candidate += CANDIDATE_STEP;
+                self.pq_push((9, 6));
                 return Some(3);
             }
             _ => {}
@@ -55,18 +55,17 @@ impl Iterator for QueuePrimesIter {
         loop {
             if self.candidate < self.next_composite.0 {
                 let x = self.candidate;
-                self.pq.push(Reverse((x * x, x * STEP)));
-                self.candidate += STEP;
+                self.pq_push((x * x, x * CANDIDATE_STEP));
+                self.candidate += CANDIDATE_STEP;
                 return Some(x);
             }
+
             while self.candidate == self.next_composite.0 {
-                self.pq.push(Reverse((
-                    self.next_composite.0 + self.next_composite.1,
-                    self.next_composite.1,
-                )));
+                let (composite, step) = self.next_composite;
+                self.pq_push((composite + step, step));
                 self.next_composite = self.pq.pop().unwrap().0;
             }
-            self.candidate += STEP;
+            self.candidate += CANDIDATE_STEP;
         }
     }
 }
@@ -79,6 +78,11 @@ impl QueuePrimesIter {
             next_composite: (9, 6),
             pq: MinPriorityQueue::default(),
         }
+    }
+
+    /// Utility function to make for cleaner code.
+    fn pq_push(&mut self, t: (u64, u64)) {
+        self.pq.push(Reverse(t));
     }
 }
 
